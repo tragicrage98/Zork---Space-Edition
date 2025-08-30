@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Arcadia Mystery Console</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      font-family: 'Share Tech Mono', monospace;
+      color: #00ffcc;
+      overflow: hidden;
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    .loading-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at center, #001a1a, #000);
+      animation: pulse 10s infinite alternate;
+      z-index: 9999;
+    }
+    @keyframes pulse {
+      0% { filter: brightness(1); }
+      100% { filter: brightness(1.2); }
+    }
+    .loading-message {
+      font-size: 2rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      animation: fadeIn 2s ease-in-out;
+      letter-spacing: 1px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .spinner {
+      width: 100px;
+      height: 100px;
+      border: 8px solid rgba(0, 255, 204, 0.2);
+      border-top: 8px solid #00ffcc;
+      border-radius: 50%;
+      animation: spin 1.2s linear infinite;
+      box-shadow: 0 0 15px #00ffcc;
+      margin-top: 2rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .boot-text {
+      margin-top: 2rem;
+      font-size: 1rem;
+      text-align: center;
+      width: 80%;
+      max-width: 600px;
+      line-height: 1.5;
+      min-height: 6rem;
+    }
+    .main-content {
+      display: none;
+      padding: 2rem;
+      color: #00ffcc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .map {
+      display: grid;
+      grid-template-columns: repeat(5, 100px);
+      grid-gap: 10px;
+      margin-bottom: 2rem;
+    }
+    .map-cell {
+      width: 100px;
+      height: 100px;
+      border: 2px solid #00ffcc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      background: #000;
+      box-shadow: 0 0 10px #00ffcc;
+      text-align: center;
+      padding: 5px;
+    }
+    .active {
+      background: #00ffcc;
+      color: black;
+      font-weight: bold;
+      box-shadow: 0 0 20px #00ffcc;
+    }
+    .terminal {
+      background: rgba(0, 0, 0, 0.85);
+      border: 2px solid #00ffcc;
+      border-radius: 10px;
+      padding: 1rem;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 0 20px #00ffcc;
+      font-family: monospace;
+      margin-bottom: 2rem;
+    }
+    .terminal-output {
+      height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    .terminal-input {
+      width: 100%;
+      padding: 0.5rem;
+      background: #000;
+      border: 1px solid #00ffcc;
+      color: #00ffcc;
+      font-family: monospace;
+    }
+    .sidenote {
+      max-width: 800px;
+      font-size: 0.9rem;
+      background: rgba(0, 255, 204, 0.1);
+      border: 1px solid #00ffcc;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #00ffcc;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 2rem;
+      text-shadow: 0 0 10px #00ffcc;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-screen">
+    <div class="loading-message">Decrypting Alien Console...</div>
+    <div class="spinner"></div>
+    <div class="boot-text" id="bootText"></div>
+    <audio autoplay loop>
+      <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+
+  <div class="main-content">
+    <h1>🧬 Arcadia Mystery Console</h1>
+
+    <div class="sidenote">
+      💡 <strong>How to Play</strong><br>
+      Type commands into the console like:<br>
+      <code>look</code> – describe your current room<br>
+      <code>go north</code>, <code>go east</code>, etc. – move between rooms<br>
+      <code>solve</code> – attempt to solve a puzzle<br>
+      <code>take</code> – collect an item<br>
+      <code>talk</code> – speak to NPCs<br>
+      <code>inventory</code> – view your items<br>
+      <code>save</code> – save your progress<br>
+      <code>exit</code> – end the session
+    </div>
+
+    <div class="map" id="mapGrid"></div>
+
+    <div class="terminal">
+      <div class="terminal-output" id="terminalOutput">
+Welcome, Commander.
+
+You awaken in a derelict alien vault beneath the Martian surface.
+The air is stale. The lights flicker. Something ancient stirs.
+
+Type a command to begin your journey.
+      </div>
+      <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter command..." />
+    </div>
+  </div>
+<script>
+const rooms = {
+  "Vault": { desc: "A flickering control room with alien glyphs.", exits: { north: "Atrium" }, items: ["keycard"] },
+  "Atrium": { desc: "A vast chamber with broken statues.", exits: { south: "Vault", east: "Lab" }, items: [] },
+  "Lab": { desc: "A glowing lab with containment pods.", exits: { west: "Atrium", north: "Observatory" }, items: ["serum"] },
+  "Observatory": { desc: "A dome with shattered glass and stars beyond.", exits: { south: "Lab" }, items: [], npc: "Watcher" }
+};
+
+let currentRoom = "Vault";
+let inventory = [];
+
+function updateMap() {
+  const mapGrid = document.getElementById("mapGrid");
+  mapGrid.innerHTML = "";
+  Object.keys(rooms).forEach(room => {
+    const cell = document.createElement("div");
+    cell.className = "map-cell" + (room === currentRoom ? " active" : "");
+    cell.textContent = room;
+    mapGrid.appendChild(cell);
+  });
+}
+
+function describeRoom() {
+  const room = rooms[currentRoom];
+  let output = `📍 ${currentRoom}\n${room.desc}`;
+  if (room.items.length) output += `\nItems here: ${room.items.join(", ")}`;
+  if (room.npc) output += `\nYou see ${room.npc} watching silently.`;
+  return output;
+}
+
+function processCommand(cmd) {
+  const output = document.getElementById("terminalOutput");
+  let response = "";
+
+  if (cmd.startsWith("go ")) {
+    const dir = cmd.split(" ")[1];
+    const next = rooms[currentRoom].exits[dir];
+    if (next) {
+      currentRoom = next;
+      response = describeRoom();
+    } else {
+      response = "🚫 You can't go that way.";
+    }
+  } else if (cmd === "look") {
+    response = describeRoom();
+  } else if (cmd === "inventory") {
+    response = inventory.length ? `🎒 Inventory: ${inventory.join(", ")}` : "🎒 Your inventory is empty.";
+  } else if (cmd === "take") {
+    const items = rooms[currentRoom].items;
+    if (items.length) {
+      inventory.push(...items);
+      rooms[currentRoom].items = [];
+      response = `✅ You took: ${inventory.join(", ")}`;
+    } else {
+      response = "📭 Nothing to take here.";
+    }
+  } else if (cmd === "talk") {
+    const npc = rooms[currentRoom].npc;
+    response = npc ? `🧠 ${npc} whispers: "The serum unlocks the gate..."` : "🗣️ There's no one to talk to.";
+  } else if (cmd === "solve") {
+    if (currentRoom === "Observatory" && inventory.includes("serum")) {
+      response = "🔓 You inject the serum. A hidden door opens to the stars.";
+    } else {
+      response = "❌ You can't solve anything here.";
+    }
+  } else if (cmd === "save") {
+    localStorage.setItem("arcadiaRoom", currentRoom);
+    localStorage.setItem("arcadiaInventory", JSON.stringify(inventory));
+    response = "💾 Progress saved.";
+  } else if (cmd === "load") {
+    currentRoom = localStorage.getItem("arcadiaRoom") || "Vault";
+    inventory = JSON.parse(localStorage.getItem("arcadiaInventory")) || [];
+    response = "📂 Progress loaded.";
+  } else if (cmd === "exit") {
+    response = "👋 Session ended. Refresh to restart.";
+  } else {
+    response = "❓ Unknown command.";
+  }
+
+  output.textContent += `\n> ${cmd}\n${response}`;
+  output.scrollTop = output.scrollHeight;
+  updateMap();
+}
+
+document.getElementById("terminalInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    processCommand(e.target.value.trim().toLowerCase());
+    e.target.value = "";
+  }
+});
+
+function bootSequence() {
+  const bootText = document.getElementById("bootText");
+  const messages = [
+    "Initializing neural uplink...",
+    "Decrypting Martian vault protocols...",
+    "Loading environmental simulation...",
+    "Establishing command interface...",
+    "Arcadia Console Ready."
+  ];
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < messages.length) {
+      bootText.textContent += messages[i] + "\n";
+      i++;
+    } else {
+      clearInterval(interval);
+      document.querySelector(".loading-screen").style.display = "none";
+      document.querySelector(".main-content").style.display = "flex";
+      updateMap();
+    }
+  }, 1000);
+}
+
+window.onload = bootSequence;
+</script>
+<script>
+// Ambient sound toggle
+let musicPlaying = true;
+document.addEventListener("keydown", e => {
+  if (e.key === "m") {
+    const audio = document.querySelector("audio");
+    musicPlaying = !musicPlaying;
+    musicPlaying ? audio.play() : audio.pause();
+    const output = document.getElementById("terminalOutput");
+    output.textContent += `\n🎵 Ambient music ${musicPlaying ? "resumed" : "paused"}.\n`;
+  }
+});
+
+// Secret commands
+const secrets = {
+  "unlock stardrive": "🚀 Stardrive activated. You feel time bend around you.",
+  "access logs": "📖 Log Entry 42: 'The Watcher was once human... before the serum.'",
+  "echo": "🌀 Echoes of your past ripple through the vault."
+};
+
+function checkSecrets(cmd) {
+  return secrets[cmd] || null;
+}
+
+// Enhanced NPC logic
+function talkToNPC(npc) {
+  if (npc === "Watcher") {
+    if (inventory.includes("keycard")) {
+      return "👁️ Watcher nods: 'The keycard grants access to the Cryo Chamber.'";
+    } else {
+      return "👁️ Watcher stares silently. You feel judged.";
+    }
+  }
+  return "🗣️ There's no one to talk to.";
+}
+
+// Override processCommand to include secrets and enhanced NPC
+const originalProcessCommand = processCommand;
+processCommand = function(cmd) {
+  const output = document.getElementById("terminalOutput");
+  const secretResponse = checkSecrets(cmd);
+  if (secretResponse) {
+    output.textContent += `\n> ${cmd}\n${secretResponse}`;
+    output.scrollTop = output.scrollHeight;
+    return;
+  }
+
+  if (cmd === "talk") {
+    const npc = rooms[currentRoom].npc;
+    const response = talkToNPC(npc);
+    output.textContent += `\n> ${cmd}\n${response}`;
+    output.scrollTop = output.scrollHeight;
+    return;
+  }
+
+  originalProcessCommand(cmd);
+};
+</script>
+</script>
+</body>
+</html>
